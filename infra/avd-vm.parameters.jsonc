@@ -1,0 +1,24 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmName": {
+            "value": "vmopcdev001"
+        },
+        "adminUsername": {
+            "value": "localAdminUser"
+        },
+        "adminPassword": {
+            "value": "***"
+        },
+        "hostPoolName": {
+            "value": "vdpool-opc-dev-001"
+        },
+        "vnetName": {
+            "value": "vnet-opc-australiaeast-001"
+        },
+        "subnetName": {
+            "value": "avd"
+        }
+    }
+}

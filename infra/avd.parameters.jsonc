@@ -1,0 +1,27 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        // Name of the AVD Host Pool
+        "hostPoolName": {
+            "value": "vdpool-opc-dev-001"
+        },
+        "hostPoolFriendlyName": {
+            "value": "OPC Dev 001"
+        },
+        // Name of the AVD Workspace
+        "workspaceName": {
+            "value": "vdws-opc-dev-001"
+        },
+        "workspaceFriendlyName": {
+            "value": "OPC Dev 001"
+        },
+        // Name of the Application Group
+        "applicationGroupName": {
+            "value": "vdag-opc-dev-001"
+        },
+        "applicationGroupFriendlyName": {
+            "value": "OPC Dev 001"
+        }
+    }
+}
