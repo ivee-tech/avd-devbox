@@ -24,9 +24,11 @@ if (-not $rgExists) {
 }
 
 # Build parameter override string
-$paramOverride = ""
+
+# Build parameter override array
+$paramOverride = @()
 if ($VmName) {
-    $paramOverride += " vmName=$VmName"
+    $paramOverride += "vmName=$VmName"
 }
 if (-not $AdminPassword) {
     Write-Host "Enter admin password:"
@@ -40,12 +42,12 @@ if ($plainPassword) {
 
 # Run Azure CLI what-if for pre-deployment validation
 Write-Host "Running Azure CLI what-if to preview changes..."
-az deployment group create --resource-group $ResourceGroupName --template-file "$(Join-Path $PSScriptRoot 'avd-vm.bicep')" --parameters "@$(Join-Path $PSScriptRoot 'avd-vm.parameters.jsonc')"$paramOverride --what-if
+az deployment group create --resource-group $ResourceGroupName --template-file "$(Join-Path $PSScriptRoot 'avd-vm.bicep')" --parameters "@$(Join-Path $PSScriptRoot 'avd-vm.parameters.jsonc')" --parameters $paramOverride --what-if
 
 # If not WhatIf, perform actual deployment
 if (-not $WhatIf) {
     Write-Host "Deploying avd-vm.bicep to resource group $ResourceGroupName using avd-vm.parameters.jsonc..."
-    az deployment group create --resource-group $ResourceGroupName --template-file "$(Join-Path $PSScriptRoot 'avd-vm.bicep')" --parameters "@$(Join-Path $PSScriptRoot 'avd-vm.parameters.jsonc')"$paramOverride
+    az deployment group create --resource-group $ResourceGroupName --template-file "$(Join-Path $PSScriptRoot 'avd-vm.bicep')" --parameters "@$(Join-Path $PSScriptRoot 'avd-vm.parameters.jsonc')" --parameters $paramOverride
     Write-Host "Deployment complete."
 } else {
     Write-Host "What-if completed. No resources were deployed."

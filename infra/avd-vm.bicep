@@ -11,10 +11,11 @@ var subnetResourceId = resourceId('Microsoft.Network/virtualNetworks/subnets', v
 var intuneMdmId = '0000000a-0000-0000-c000-000000000000'
 var modulesUrl = 'https://wvdportalstorageblob.blob.${environment().suffixes.storage}/galleryartifacts/Configuration_3-10-2021.zip'
 
-
-resource hostPool 'Microsoft.DesktopVirtualization/hostPools@2025-04-01-preview' existing = {
+resource hostPool 'Microsoft.DesktopVirtualization/hostPools@2024-04-03' existing = {
   name: hostPoolName
 }
+
+var registrationToken = first(hostPool.listRegistrationTokens().value).token
 
 module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.20.0' = {
   name: 'virtualMachineDeployment'
@@ -23,9 +24,9 @@ module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.20.0' = {
     adminUsername: adminUsername
     availabilityZone: -1
     imageReference: {
-      offer: 'WindowsServer'
-      publisher: 'MicrosoftWindowsServer'
-      sku: '2022-datacenter-azure-edition'
+      publisher: 'microsoftwindowsdesktop'
+      offer: 'windows-11'
+      sku: 'win11-24h2-avd'
       version: 'latest'
     }
     name: vmName
@@ -44,33 +45,35 @@ module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.20.0' = {
       caching: 'ReadWrite'
       diskSizeGB: 128
       managedDisk: {
-        storageAccountType: 'Premium_LRS'
+        storageAccountType: 'Standard_LRS'
       }
     }
     osType: 'Windows'
-    vmSize: 'Standard_D2s_v3'
+    vmSize: 'Standard_D4ads_v5'
     // Non-required parameters
     adminPassword: adminPassword
     extensionAadJoinConfig: {
-      enabled: true
+      enabled: false // temporarily disabled due to mdmId issues in personal env, deploy extension manually
       settings: {
-        mdmId: intuneMdmId
+        // mdmId: intuneMdmId
       }
-      tags: {
-      }
+      tags: {}
     }
     extensionHostPoolRegistration: {
       configurationFunction: 'Configuration.ps1\\AddSessionHost'
       enabled: true
       hostPoolName: hostPoolName
       modulesUrl: modulesUrl
-      registrationInfoToken: listRegistrationToken(hostPool.id, hostPool.apiVersion).token
-      tags: {
-      }
+      registrationInfoToken: registrationToken
+      // registrationInfoToken: hostPool.properties.registrationInfo.token
+      tags: {}
     }
     location: location
     managedIdentities: {
       systemAssigned: true
     }
+    vTpmEnabled: true
+    secureBootEnabled: true
+    securityType: 'TrustedLaunch'
   }
 }

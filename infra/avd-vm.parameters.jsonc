@@ -15,10 +15,10 @@
             "value": "vdpool-opc-dev-001"
         },
         "vnetName": {
-            "value": "vnet-opc-australiaeast-001"
+            "value": "vnet-opc-dev-eau-001"
         },
         "subnetName": {
-            "value": "avd"
+            "value": "default"
         }
     }
 }
