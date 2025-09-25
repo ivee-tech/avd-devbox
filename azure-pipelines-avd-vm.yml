@@ -1,0 +1,151 @@
+# Azure DevOps Pipeline for AVD VM Deployment
+# This pipeline deploys Azure Virtual Desktop (AVD) virtual machines to an existing host pool
+
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - infra/avd-vm.bicep
+    - infra/avd-vm.parameters.jsonc
+    - infra/deploy-avd-vm.ps1
+
+variables:
+  - name: resourceGroupName
+    value: 'rg-opc-dev-001'
+  - name: vmName
+    value: 'vmopcdev-1'
+  - name: serviceConnectionName
+    value: 'Azure-DevOps-Service-Connection' # Replace with your actual service connection name
+  - name: keyVaultName
+    value: 'kv-avd-secrets' # Replace with your actual Key Vault name
+  - name: adminPasswordSecret
+    value: 'vm-admin-password' # Replace with your actual secret name
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: ValidateAVDVM
+  displayName: 'Validate AVD VM Infrastructure'
+  jobs:
+  - job: ValidateVMDeployment
+    displayName: 'Validate VM Bicep Template'
+    steps:
+    - checkout: self
+    
+    - task: AzureKeyVault@2
+      displayName: 'Get VM Admin Password from Key Vault'
+      inputs:
+        azureSubscription: '$(serviceConnectionName)'
+        KeyVaultName: '$(keyVaultName)'
+        SecretsFilter: '$(adminPasswordSecret)'
+        RunAsPreJob: false
+    
+    - task: AzureCLI@2
+      displayName: 'Validate AVD VM Bicep Template'
+      inputs:
+        azureSubscription: '$(serviceConnectionName)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Validating AVD VM Bicep template..."
+          
+          # Validate the deployment with what-if
+          az deployment group what-if \
+            --resource-group $(resourceGroupName) \
+            --template-file ./infra/avd-vm.bicep \
+            --parameters @./infra/avd-vm.parameters.jsonc \
+            --parameters vmName=$(vmName) adminPassword="$($(adminPasswordSecret))"
+          
+          echo "What-if validation completed successfully"
+
+- stage: DeployAVDVM
+  displayName: 'Deploy AVD VM'
+  dependsOn: ValidateAVDVM
+  condition: succeeded()
+  jobs:
+  - deployment: DeployAVDVirtualMachine
+    displayName: 'Deploy AVD Virtual Machine'
+    environment: 'Development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          
+          - task: AzureKeyVault@2
+            displayName: 'Get VM Admin Password from Key Vault'
+            inputs:
+              azureSubscription: '$(serviceConnectionName)'
+              KeyVaultName: '$(keyVaultName)'
+              SecretsFilter: '$(adminPasswordSecret)'
+              RunAsPreJob: false
+          
+          - task: AzureCLI@2
+            displayName: 'Deploy AVD Virtual Machine'
+            inputs:
+              azureSubscription: '$(serviceConnectionName)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Deploying AVD virtual machine..."
+                
+                # Deploy the VM Bicep template
+                az deployment group create \
+                  --resource-group $(resourceGroupName) \
+                  --template-file ./infra/avd-vm.bicep \
+                  --parameters @./infra/avd-vm.parameters.jsonc \
+                  --parameters vmName=$(vmName) adminPassword="$($(adminPasswordSecret))" \
+                  --name "avd-vm-deployment-$(Build.BuildNumber)"
+                
+                echo "AVD VM deployment completed successfully"
+
+          - task: AzureCLI@2
+            displayName: 'Output VM Deployment Results'
+            inputs:
+              azureSubscription: '$(serviceConnectionName)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Getting VM deployment outputs..."
+                az deployment group show \
+                  --resource-group $(resourceGroupName) \
+                  --name "avd-vm-deployment-$(Build.BuildNumber)" \
+                  --query properties.outputs
+
+- stage: PostDeployment
+  displayName: 'Post-Deployment Configuration'
+  dependsOn: DeployAVDVM
+  condition: succeeded()
+  jobs:
+  - job: ConfigureVM
+    displayName: 'Configure AVD VM'
+    steps:
+    - checkout: self
+    
+    - task: AzureCLI@2
+      displayName: 'Verify VM Status and Configuration'
+      inputs:
+        azureSubscription: '$(serviceConnectionName)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Verifying VM deployment and configuration..."
+          
+          # Check VM status
+          az vm show \
+            --resource-group $(resourceGroupName) \
+            --name $(vmName) \
+            --show-details \
+            --query '{Name:name, PowerState:powerState, ProvisioningState:provisioningState, Location:location}'
+          
+          # Get VM network configuration
+          echo "VM Network Configuration:"
+          az vm list-ip-addresses \
+            --resource-group $(resourceGroupName) \
+            --name $(vmName) \
+            --query '[].virtualMachine.network.{PrivateIpAddress:privateIpAddresses, PublicIpAddress:publicIpAddresses}'
+          
+          echo "VM verification completed"

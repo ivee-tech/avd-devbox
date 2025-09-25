@@ -1,0 +1,159 @@
+# Azure DevOps Pipeline for AVD VM Deployment (PowerShell)
+# This pipeline deploys Azure Virtual Desktop (AVD) virtual machines using PowerShell scripts
+
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - infra/avd-vm.bicep
+    - infra/avd-vm.parameters.jsonc
+    - infra/deploy-avd-vm.ps1
+
+variables:
+  - name: resourceGroupName
+    value: 'rg-opc-dev-001'
+  - name: vmName
+    value: 'vmopcdev-1'
+  - name: serviceConnectionName
+    value: 'Azure-DevOps-Service-Connection' # Replace with your actual service connection name
+  - name: keyVaultName
+    value: 'kv-avd-secrets' # Replace with your actual Key Vault name
+  - name: adminPasswordSecret
+    value: 'vm-admin-password' # Replace with your actual secret name
+
+pool:
+  vmImage: 'windows-latest'
+
+stages:
+- stage: ValidateAVDVM
+  displayName: 'Validate AVD VM Infrastructure'
+  jobs:
+  - job: ValidateVMDeployment
+    displayName: 'Validate VM Deployment with PowerShell'
+    steps:
+    - checkout: self
+    
+    - task: AzureKeyVault@2
+      displayName: 'Get VM Admin Password from Key Vault'
+      inputs:
+        azureSubscription: '$(serviceConnectionName)'
+        KeyVaultName: '$(keyVaultName)'
+        SecretsFilter: '$(adminPasswordSecret)'
+        RunAsPreJob: false
+    
+    - task: AzurePowerShell@5
+      displayName: 'Validate AVD VM with PowerShell Script'
+      inputs:
+        azureSubscription: '$(serviceConnectionName)'
+        ScriptType: 'InlineScript'
+        azurePowerShellVersion: 'LatestVersion'
+        Inline: |
+          Write-Host "Validating AVD VM deployment using PowerShell script..."
+          
+          # Convert password from pipeline variable to SecureString
+          $securePassword = ConvertTo-SecureString "$($(adminPasswordSecret))" -AsPlainText -Force
+          
+          # Change to infra directory
+          Set-Location -Path "$(Build.SourcesDirectory)\infra"
+          
+          # Run the deployment script with -WhatIf flag
+          try {
+            .\deploy-avd-vm.ps1 -ResourceGroupName "$(resourceGroupName)" -VmName "$(vmName)" -AdminPassword $securePassword -WhatIf
+            Write-Host "Validation completed successfully"
+          }
+          catch {
+            Write-Error "Validation failed: $_"
+            exit 1
+          }
+
+- stage: DeployAVDVM
+  displayName: 'Deploy AVD VM'
+  dependsOn: ValidateAVDVM
+  condition: succeeded()
+  jobs:
+  - deployment: DeployAVDVirtualMachine
+    displayName: 'Deploy AVD Virtual Machine with PowerShell'
+    environment: 'Development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          
+          - task: AzureKeyVault@2
+            displayName: 'Get VM Admin Password from Key Vault'
+            inputs:
+              azureSubscription: '$(serviceConnectionName)'
+              KeyVaultName: '$(keyVaultName)'
+              SecretsFilter: '$(adminPasswordSecret)'
+              RunAsPreJob: false
+          
+          - task: AzurePowerShell@5
+            displayName: 'Deploy AVD VM with PowerShell Script'
+            inputs:
+              azureSubscription: '$(serviceConnectionName)'
+              ScriptType: 'InlineScript'
+              azurePowerShellVersion: 'LatestVersion'
+              Inline: |
+                Write-Host "Deploying AVD VM using PowerShell script..."
+                
+                # Convert password from pipeline variable to SecureString
+                $securePassword = ConvertTo-SecureString "$($(adminPasswordSecret))" -AsPlainText -Force
+                
+                # Change to infra directory
+                Set-Location -Path "$(Build.SourcesDirectory)\infra"
+                
+                # Run the deployment script
+                try {
+                  .\deploy-avd-vm.ps1 -ResourceGroupName "$(resourceGroupName)" -VmName "$(vmName)" -AdminPassword $securePassword
+                  Write-Host "AVD VM deployment completed successfully"
+                }
+                catch {
+                  Write-Error "Deployment failed: $_"
+                  exit 1
+                }
+
+- stage: PostDeployment
+  displayName: 'Post-Deployment Verification'
+  dependsOn: DeployAVDVM
+  condition: succeeded()
+  jobs:
+  - job: VerifyDeployment
+    displayName: 'Verify VM Deployment'
+    steps:
+    - checkout: self
+    
+    - task: AzurePowerShell@5
+      displayName: 'Verify AVD VM Deployment'
+      inputs:
+        azureSubscription: '$(serviceConnectionName)'
+        ScriptType: 'InlineScript'
+        azurePowerShellVersion: 'LatestVersion'
+        Inline: |
+          Write-Host "Verifying AVD VM deployment..."
+          
+          # Check VM status
+          $vm = Get-AzVM -ResourceGroupName "$(resourceGroupName)" -Name "$(vmName)" -Status
+          if ($vm) {
+            Write-Host "VM Status Information:"
+            Write-Host "Name: $($vm.Name)"
+            Write-Host "Location: $($vm.Location)"
+            Write-Host "VM Size: $($vm.HardwareProfile.VmSize)"
+            Write-Host "Provisioning State: $($vm.ProvisioningState)"
+            
+            # Get power state
+            $powerState = ($vm.Statuses | Where-Object {$_.Code -like "PowerState/*"}).DisplayStatus
+            Write-Host "Power State: $powerState"
+            
+            # Get network information
+            $networkProfile = Get-AzNetworkInterface -ResourceId $vm.NetworkProfile.NetworkInterfaces[0].Id
+            Write-Host "Private IP Address: $($networkProfile.IpConfigurations[0].PrivateIpAddress)"
+          }
+          else {
+            Write-Error "VM not found or deployment verification failed"
+            exit 1
+          }
+          
+          Write-Host "VM deployment verification completed successfully"

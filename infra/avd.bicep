@@ -15,6 +15,7 @@ module hostPool 'br/public:avm/res/desktop-virtualization/host-pool:0.8.0' = {
     loadBalancerType: 'BreadthFirst'
     preferredAppGroupType: 'Desktop'
     startVMOnConnect: true
+    
   }
 }
 

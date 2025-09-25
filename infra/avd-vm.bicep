@@ -21,6 +21,7 @@ module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.20.0' = {
   name: 'virtualMachineDeployment'
   params: {
     // Required parameters
+    autoShutdownConfig: {dailyRecurrenceTime: 1900}
     adminUsername: adminUsername
     availabilityZone: -1
     imageReference: {
@@ -53,9 +54,9 @@ module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.20.0' = {
     // Non-required parameters
     adminPassword: adminPassword
     extensionAadJoinConfig: {
-      enabled: false // temporarily disabled due to mdmId issues in personal env, deploy extension manually
+      enabled: true // temporarily disabled due to mdmId issues in personal env, deploy extension manually
       settings: {
-        // mdmId: intuneMdmId
+        mdmId: intuneMdmId
       }
       tags: {}
     }
