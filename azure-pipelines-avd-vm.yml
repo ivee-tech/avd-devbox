@@ -18,10 +18,10 @@ variables:
     value: 'vmopcdev-1'
   - name: serviceConnectionName
     value: 'Azure-DevOps-Service-Connection' # Replace with your actual service connection name
-  - name: keyVaultName
-    value: 'kv-avd-secrets' # Replace with your actual Key Vault name
-  - name: adminPasswordSecret
-    value: 'vm-admin-password' # Replace with your actual secret name
+  # - name: adminPasswordSecret # use from var group AVD-VM
+  #   value: '***' # Replace with your actual secret name
+  - group: 'AVD-VM'
+
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -34,14 +34,6 @@ stages:
     displayName: 'Validate VM Bicep Template'
     steps:
     - checkout: self
-    
-    - task: AzureKeyVault@2
-      displayName: 'Get VM Admin Password from Key Vault'
-      inputs:
-        azureSubscription: '$(serviceConnectionName)'
-        KeyVaultName: '$(keyVaultName)'
-        SecretsFilter: '$(adminPasswordSecret)'
-        RunAsPreJob: false
     
     - task: AzureCLI@2
       displayName: 'Validate AVD VM Bicep Template'
@@ -74,14 +66,6 @@ stages:
         deploy:
           steps:
           - checkout: self
-          
-          - task: AzureKeyVault@2
-            displayName: 'Get VM Admin Password from Key Vault'
-            inputs:
-              azureSubscription: '$(serviceConnectionName)'
-              KeyVaultName: '$(keyVaultName)'
-              SecretsFilter: '$(adminPasswordSecret)'
-              RunAsPreJob: false
           
           - task: AzureCLI@2
             displayName: 'Deploy AVD Virtual Machine'
