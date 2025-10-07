@@ -49,7 +49,7 @@ stages:
             --resource-group $(resourceGroupName) \
             --template-file ./infra/avd-vm.bicep \
             --parameters @./infra/avd-vm.parameters.jsonc \
-            --parameters vmName=$(vmName) adminPassword="$($(adminPasswordSecret))"
+            --parameters vmName=$(vmName) adminPassword="$(adminPasswordSecret)"
           
           echo "What-if validation completed successfully"
 

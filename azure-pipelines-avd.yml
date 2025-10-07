@@ -84,6 +84,13 @@ stages:
                 fi
                 
                 # Deploy the Bicep template
+                echo "Running what-if preview (no changes applied)..."
+                az deployment group what-if \
+                  --resource-group $(resourceGroupName) \
+                  --template-file ./infra/avd.bicep \
+                  --parameters @./infra/avd.parameters.jsonc \
+                  --no-pretty-print || { echo "what-if failed; aborting deployment" >&2; exit 1; }
+                echo "what-if preview completed. Proceeding with actual deployment..."
                 az deployment group create \
                   --resource-group $(resourceGroupName) \
                   --template-file ./infra/avd.bicep \
