@@ -81,7 +81,7 @@ stages:
                   --resource-group $(resourceGroupName) \
                   --template-file ./infra/avd-vm.bicep \
                   --parameters @./infra/avd-vm.parameters.jsonc \
-                  --parameters vmName=$(vmName) adminPassword="$($(adminPasswordSecret))" \
+                  --parameters vmName=$(vmName) adminPassword="$(adminPasswordSecret)" \
                   --name "avd-vm-deployment-$(Build.BuildNumber)"
                 
                 echo "AVD VM deployment completed successfully"
